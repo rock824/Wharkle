@@ -217,9 +217,9 @@ def start_game():
     document.getElementById("output").innerHTML = f"{players[current_player]}'s turn!"
     speak(f"{players[current_player]}'s turn")
 
-window.rollDice = roll
-window.holdDice = hold
-window.startGame = start_game
+<button onclick="startGame()">Start Game</button>
+<button onclick="rollDice()">Roll Dice</button>
+<button onclick="holdDice()">Hold</button>
 </script>
 </body>
 </html>
