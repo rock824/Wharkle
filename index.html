@@ -18,7 +18,7 @@
   <div id="output"></div>
 
   <!-- THIS IS THE KEY CHANGE -->
-  <script type="py">
+<script type="py">
 import random
 from collections import Counter
 from js import document, window
@@ -85,8 +85,9 @@ def reset_turn():
     dice_left = 6
     turn_score = 0
 
-document.getElementById("rollBtn").addEventListener("click", roll)
-document.getElementById("holdBtn").addEventListener("click", hold)
-  </script>
-</body>
-</html>
+def setup():
+    document.getElementById("rollBtn").addEventListener("click", roll)
+    document.getElementById("holdBtn").addEventListener("click", hold)
+
+window.onload = setup
+</script>
