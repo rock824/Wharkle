@@ -114,8 +114,8 @@ window.toggleDie = toggle_die
 def roll(*args):
     global current_roll, selected, dice_left, turn_score, current_player
 
-    if dice_left == 0:
-        dice_left = 6
+    if dice_left <= 0:
+        dice_left = 6  # start with 6 dice
 
     current_roll = [random.randint(1,6) for _ in range(dice_left)]
     selected.clear()
@@ -178,9 +178,7 @@ def update_scoreboard():
 def ai_turn():
     global selected
     speak(f"{players[current_player]} (AI) is rolling!")
-    import time
     import js
-    # Simple AI: roll until score >= 500 or Farkle
     while True:
         roll()
         js.window.setTimeout(lambda: None, 500)  # pause for animation
@@ -211,6 +209,10 @@ def start_game():
         is_ai = window.confirm(f"Is {name} an AI player?")
         ai_players.append(is_ai)
 
+    # Bind buttons here AFTER initializing variables
+    document.getElementById("rollBtn").addEventListener("click", lambda e: roll())
+    document.getElementById("holdBtn").addEventListener("click", lambda e: hold())
+
     update_scoreboard()
     document.getElementById("output").innerHTML = f"{players[current_player]}'s turn!"
     speak(f"{players[current_player]}'s turn")
@@ -218,10 +220,6 @@ def start_game():
 window.rollDice = roll
 window.holdDice = hold
 window.startGame = start_game
-
-# Bind buttons
-document.getElementById("rollBtn").addEventListener("click", lambda e: roll())
-document.getElementById("holdBtn").addEventListener("click", lambda e: hold())
 </script>
 </body>
 </html>
