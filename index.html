@@ -45,6 +45,7 @@ turn_score = 0
 dice_left = 6
 current_roll = []
 selected = []
+kept_dice = []
 
 # --- Speak helper ---
 def speak(text):
@@ -67,7 +68,6 @@ def score_dice(dice):
     if values == [2,4]:
         return 1500, 6
 
-    # Of-a-kind scoring
     used = 0
     for num, count in counts.items():
         if count >= 3:
@@ -82,7 +82,6 @@ def score_dice(dice):
             used += count
             counts[num] = 0
 
-    # Single die scoring
     score += counts[1] * 100
     used += counts[1]
     score += counts[5] * 50
@@ -109,20 +108,21 @@ window.toggleDie = toggle_die
 
 # --- Roll dice ---
 def roll(*args):
-    global current_roll, selected, dice_left, turn_score, current_player
+    global current_roll, selected, dice_left
 
     if dice_left <= 0:
         dice_left = 6
+        kept_dice.clear()  # Hot Dice
 
+    # Only roll dice not yet kept
     current_roll = [random.randint(1,6) for _ in range(dice_left)]
     selected.clear()
     render_dice()
-
-    window.document.getElementById("output").innerHTML = f"{players[current_player]} rolled. Select dice to score!"
+    window.document.getElementById("output").innerHTML = f"{players[current_player]} rolled. Select dice to keep!"
 
 # --- Hold ---
 def hold(*args):
-    global turn_score, dice_left, current_player
+    global turn_score, dice_left, current_player, kept_dice, selected
 
     if not selected:
         window.document.getElementById("output").innerHTML = "Select dice before holding!"
@@ -136,14 +136,19 @@ def hold(*args):
 
     turn_score += score
     dice_left -= used
+    kept_dice.extend(chosen)
+    selected.clear()
+    render_dice()
+
     window.document.getElementById("output").innerHTML = f"{players[current_player]} scored {score} points!"
 
-    # Hot Dice
-    if dice_left == 0:
+    # Hot Dice: all dice scored
+    if dice_left <= 0:
         dice_left = 6
+        kept_dice.clear()
         window.document.getElementById("output").innerHTML += "<br>🔥 Hot Dice! Roll all 6 again!"
 
-    # Update total score and scoreboard
+    # Update total score
     scores[current_player] += turn_score
     update_scoreboard()
 
@@ -155,6 +160,8 @@ def hold(*args):
 
     # Next player
     turn_score = 0
+    dice_left = 6
+    kept_dice.clear()
     current_player = (current_player + 1) % len(players)
     window.document.getElementById("output").innerHTML += f"<br>Next up: {players[current_player]}"
     speak(f"{players[current_player]}'s turn")
@@ -190,7 +197,7 @@ def ai_turn():
 
 # --- Start Game ---
 def start_game():
-    global players, scores, ai_players, current_player, turn_score, dice_left, current_roll, selected
+    global players, scores, ai_players, current_player, turn_score, dice_left, current_roll, selected, kept_dice
     count = int(window.prompt("How many players?"))
     players = []
     scores = [0] * count
@@ -200,6 +207,7 @@ def start_game():
     dice_left = 6
     current_roll = []
     selected = []
+    kept_dice = []
 
     for i in range(count):
         name = window.prompt(f"Enter name for Player {i+1}")
