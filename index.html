@@ -1,80 +1,93 @@
-<!DOCTYPE html>  
-<html>  
-<head>  
-  <title>Farkle</title>  
-  <script defer src="https://pyscript.net/latest/pyscript.js"></script>  
-</head>  
-  
-<body>  
-<h1>🎲 Farkle</h1>  
-  
-<button py-click="roll()">Roll Dice</button>  
-<button py-click="hold()">Hold</button>  
-  
-<p id="output"></p>  
-  
-<py-script>  
-import random  
-from collections import Counter  
-from js import document, window  
-  
-dice_left = 6  
-turn_score = 0  
-total_score = 0  
-  
-def speak(text):  
-    window.speechSynthesis.speak(  
-        window.SpeechSynthesisUtterance.new(text)  
-    )  
-  
-def roll():  
-    global dice_left, turn_score, total_score  
-  
-    dice = [random.randint(1,6) for _ in range(dice_left)]  
-    output = f"Rolled: {dice}<br>"  
-  
-    score, used = score_dice(dice)  
-  
-    if score == 0:  
-        output += "🔥 FARKLE!"  
-        speak("Farkle!")  
-        reset_turn()  
-    else:  
-        turn_score += score  
-        dice_left -= used  
-        output += f"Scored {score}. Turn total {turn_score}"  
-        speak(f"You scored {score} points.")  
-  
-    document.getElementById("output").innerHTML = output  
-  
-def hold():  
-    global total_score, turn_score  
-    total_score += turn_score  
-    speak(f"Total score is {total_score}")  
-    reset_turn()  
-  
-def reset_turn():  
-    global dice_left, turn_score  
-    dice_left = 6  
-    turn_score = 0  
-  
-def score_dice(dice):  
-    counts = Counter(dice)  
-    score = 0  
-    used = 0  
-  
-    for num in range(1,7):  
-        if counts[num] >= 3:  
-            score += 1000 if num == 1 else num * 100  
-            counts[num] -= 3  
-            used += 3  
-  
-    score += counts[1] * 100  
-    used += counts[1]  
-    score += counts[5] * 50  
-    used += counts[5]  
-  
-    return score, used  
-</py-script>  
-</body>  
-</html>  
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>🎲 Farkle</title>
+
+  <!-- PyScript CSS -->
+  <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+
+  <!-- PyScript JS -->
+  <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+</head>
+
+<body>
+  <h1>🎲 Farkle</h1>
+
+  <button id="rollBtn">Roll Dice</button>
+  <button id="holdBtn">Hold</button>
+
+  <div id="output"></div>
+
+  <py-script>
+import random
+from collections import Counter
+from js import document, window
+
+dice_left = 6
+turn_score = 0
+total_score = 0
+
+def speak(text):
+    utterance = window.SpeechSynthesisUtterance.new(text)
+    window.speechSynthesis.speak(utterance)
+
+def score_dice(dice):
+    counts = Counter(dice)
+    score = 0
+    used = 0
+
+    for num in range(1,7):
+        if counts[num] >= 3:
+            score += 1000 if num == 1 else num * 100
+            counts[num] -= 3
+            used += 3
+
+    score += counts[1] * 100
+    used += counts[1]
+    score += counts[5] * 50
+    used += counts[5]
+
+    return score, used
+
+def roll(event=None):
+    global dice_left, turn_score
+    dice = [random.randint(1,6) for _ in range(dice_left)]
+    score, used = score_dice(dice)
+
+    if score == 0:
+        document.getElementById("output").innerHTML = "🔥 FARKLE!"
+        speak("Farkle!")
+        reset_turn()
+    else:
+        turn_score += score
+        dice_left -= used
+        document.getElementById("output").innerHTML = (
+            f"Rolled {dice}<br>"
+            f"Scored {score}<br>"
+            f"Turn total {turn_score}"
+        )
+        speak(f"You scored {score} points")
+
+    if dice_left == 0:
+        dice_left = 6
+
+def hold(event=None):
+    global total_score, turn_score
+    total_score += turn_score
+    document.getElementById("output").innerHTML = (
+        f"Held! Total score: {total_score}"
+    )
+    speak(f"Total score is {total_score}")
+    reset_turn()
+
+def reset_turn():
+    global dice_left, turn_score
+    dice_left = 6
+    turn_score = 0
+
+document.getElementById("rollBtn").addEventListener("click", roll)
+document.getElementById("holdBtn").addEventListener("click", hold)
+  </py-script>
+</body>
+</html>
