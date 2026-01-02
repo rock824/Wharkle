@@ -21,11 +21,11 @@
 </head>
 
 <body>
-  <h1>🎲 Wharkle</h1>
+  <h1>🎲 Farkle</h1>
 
   <button onclick="startGame()">Start Game</button>
-  <button id="rollBtn">Roll Dice</button>
-  <button id="holdBtn">Hold</button>
+  <button onclick="rollDice()">Roll Dice</button>
+  <button onclick="holdDice()">Hold</button>
 
   <div id="output"></div>
   <div id="dice"></div>
@@ -34,7 +34,7 @@
 <script type="py">
 import random
 from collections import Counter
-from js import document, window
+from js import window
 
 # --- Game State ---
 players = []
@@ -59,16 +59,13 @@ def score_dice(dice):
 
     # Special 6-dice combos
     if sorted(dice) == [1,2,3,4,5,6]:
-        return 1500, 6  # Straight
-
+        return 1500, 6
     if values == [2,2,2]:
-        return 1500, 6  # Three pairs
-
+        return 1500, 6
     if values == [3,3]:
-        return 2500, 6  # Two triplets
-
+        return 2500, 6
     if values == [2,4]:
-        return 1500, 6  # Four of a kind + pair
+        return 1500, 6
 
     # Of-a-kind scoring
     used = 0
@@ -95,7 +92,7 @@ def score_dice(dice):
 
 # --- Dice rendering ---
 def render_dice():
-    dice_div = document.getElementById("dice")
+    dice_div = window.document.getElementById("dice")
     dice_div.innerHTML = ""
     for i, die in enumerate(current_roll):
         cls = "selected" if i in selected else ""
@@ -115,36 +112,36 @@ def roll(*args):
     global current_roll, selected, dice_left, turn_score, current_player
 
     if dice_left <= 0:
-        dice_left = 6  # start with 6 dice
+        dice_left = 6
 
     current_roll = [random.randint(1,6) for _ in range(dice_left)]
     selected.clear()
     render_dice()
 
-    document.getElementById("output").innerHTML = f"{players[current_player]} rolled. Select dice to score!"
+    window.document.getElementById("output").innerHTML = f"{players[current_player]} rolled. Select dice to score!"
 
 # --- Hold ---
 def hold(*args):
     global turn_score, dice_left, current_player
 
     if not selected:
-        document.getElementById("output").innerHTML = "Select dice before holding!"
+        window.document.getElementById("output").innerHTML = "Select dice before holding!"
         return
 
     chosen = [current_roll[i] for i in selected]
     score, used = score_dice(chosen)
     if score == 0:
-        document.getElementById("output").innerHTML = "Invalid selection!"
+        window.document.getElementById("output").innerHTML = "Invalid selection!"
         return
 
     turn_score += score
     dice_left -= used
-    document.getElementById("output").innerHTML = f"{players[current_player]} scored {score} points!"
+    window.document.getElementById("output").innerHTML = f"{players[current_player]} scored {score} points!"
 
     # Hot Dice
     if dice_left == 0:
         dice_left = 6
-        document.getElementById("output").innerHTML += "<br>🔥 Hot Dice! Roll all 6 again!"
+        window.document.getElementById("output").innerHTML += "<br>🔥 Hot Dice! Roll all 6 again!"
 
     # Update total score and scoreboard
     scores[current_player] += turn_score
@@ -152,17 +149,17 @@ def hold(*args):
 
     # Check win
     if scores[current_player] >= 10000:
-        document.getElementById("output").innerHTML = f"🏆 {players[current_player]} wins with {scores[current_player]} points!"
+        window.document.getElementById("output").innerHTML = f"🏆 {players[current_player]} wins with {scores[current_player]} points!"
         speak(f"{players[current_player]} wins!")
         return
 
     # Next player
     turn_score = 0
     current_player = (current_player + 1) % len(players)
-    document.getElementById("output").innerHTML += f"<br>Next up: {players[current_player]}"
+    window.document.getElementById("output").innerHTML += f"<br>Next up: {players[current_player]}"
     speak(f"{players[current_player]}'s turn")
 
-    # AI turn if needed
+    # AI turn
     if ai_players[current_player]:
         ai_turn()
 
@@ -172,7 +169,7 @@ def update_scoreboard():
     for i, name in enumerate(players):
         turn = "➡️" if i == current_player else ""
         html += f"{turn} {name}: {scores[i]}<br>"
-    document.getElementById("scoreboard").innerHTML = html
+    window.document.getElementById("scoreboard").innerHTML = html
 
 # --- AI logic ---
 def ai_turn():
@@ -181,8 +178,7 @@ def ai_turn():
     import js
     while True:
         roll()
-        js.window.setTimeout(lambda: None, 500)  # pause for animation
-        # Auto-select all scoring dice
+        js.window.setTimeout(lambda: None, 500)
         selected = list(range(len(current_roll)))
         chosen = [current_roll[i] for i in selected]
         score, used = score_dice(chosen)
@@ -194,7 +190,7 @@ def ai_turn():
 
 # --- Start Game ---
 def start_game():
-    global players, scores, ai_players, current_player, turn_score, dice_left
+    global players, scores, ai_players, current_player, turn_score, dice_left, current_roll, selected
     count = int(window.prompt("How many players?"))
     players = []
     scores = [0] * count
@@ -202,6 +198,8 @@ def start_game():
     current_player = 0
     turn_score = 0
     dice_left = 6
+    current_roll = []
+    selected = []
 
     for i in range(count):
         name = window.prompt(f"Enter name for Player {i+1}")
@@ -209,17 +207,14 @@ def start_game():
         is_ai = window.confirm(f"Is {name} an AI player?")
         ai_players.append(is_ai)
 
-    # Bind buttons here AFTER initializing variables
-    document.getElementById("rollBtn").addEventListener("click", lambda e: roll())
-    document.getElementById("holdBtn").addEventListener("click", lambda e: hold())
-
     update_scoreboard()
-    document.getElementById("output").innerHTML = f"{players[current_player]}'s turn!"
+    window.document.getElementById("output").innerHTML = f"{players[current_player]}'s turn!"
     speak(f"{players[current_player]}'s turn")
 
-<button onclick="startGame()">Start Game</button>
-<button onclick="rollDice()">Roll Dice</button>
-<button onclick="holdDice()">Hold</button>
+# --- Expose functions to JS ---
+window.rollDice = roll
+window.holdDice = hold
+window.startGame = start_game
 </script>
 </body>
 </html>
