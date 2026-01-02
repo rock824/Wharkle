@@ -36,14 +36,31 @@ def score_dice(dice):
     score = 0
     used = 0
 
-    for num in range(1, 7):
-        if counts[num] >= 3:
-            score += 1000 if num == 1 else num * 100
-            counts[num] -= 3
-            used += 3
+    # Straight
+    if sorted(dice) == [1,2,3,4,5,6]:
+        return 1500, 6
 
+    # Three pairs
+    if list(counts.values()).count(2) == 3:
+        return 1500, 6
+
+    for num, count in counts.items():
+        if count >= 3:
+            if count == 3:
+                score += 1000 if num == 1 else num * 100
+            elif count == 4:
+                score += 1000
+            elif count == 5:
+                score += 2000
+            elif count == 6:
+                score += 3000
+            used += count
+            counts[num] = 0
+
+    # Singles
     score += counts[1] * 100
     used += counts[1]
+
     score += counts[5] * 50
     used += counts[5]
 
