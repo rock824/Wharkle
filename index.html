@@ -49,7 +49,7 @@ def score_dice(dice):
 
     return score, used
 
-def roll(event=None):
+def roll(*args):
     global dice_left, turn_score
     dice = [random.randint(1, 6) for _ in range(dice_left)]
     score, used = score_dice(dice)
@@ -71,7 +71,7 @@ def roll(event=None):
     if dice_left == 0:
         dice_left = 6
 
-def hold(event=None):
+def hold(*args):
     global total_score, turn_score
     total_score += turn_score
     document.getElementById("output").innerHTML = (
@@ -85,9 +85,19 @@ def reset_turn():
     dice_left = 6
     turn_score = 0
 
-def setup():
-    document.getElementById("rollBtn").addEventListener("click", roll)
-    document.getElementById("holdBtn").addEventListener("click", hold)
+# 🔑 EXPOSE FUNCTIONS TO JS
+window.rollDice = roll
+window.holdDice = hold
+</script>
 
-document.addEventListener("DOMContentLoaded", setup)
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("rollBtn").addEventListener("click", () => {
+    window.rollDice()
+  })
+
+  document.getElementById("holdBtn").addEventListener("click", () => {
+    window.holdDice()
+  })
+})
 </script>
