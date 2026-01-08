@@ -1,85 +1,64 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>🎲 Farkle</title>
+<meta charset="UTF-8">
+<title>🎲 Farkle</title>
 
-  <!-- PyScript -->
-  <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-  <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+<link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+<script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-  <style>
-    .die { margin: 3px; padding: 10px; font-size: 20px; }
-    .selected { background-color: yellow; }
-    button { padding: 10px; font-size: 16px; margin: 5px; }
-  </style>
+<style>
+  body { font-family: sans-serif; }
+  .die { font-size: 22px; padding: 10px; margin: 4px; }
+  .selected { background: gold; }
+  .locked { background: lightgreen; }
+</style>
 </head>
 
 <body>
-  <h1>🎲 Farkle</h1>
+<h1>🎲 Farkle</h1>
 
-  <button onclick="startGame()">Start Game</button>
-  <button onclick="rollDice()">Roll Dice</button>
-  <button onclick="holdDice()">Hold</button>
+<button onclick="startGame()">Start Game</button>
+<button onclick="rollDice()">Roll</button>
+<button onclick="lockDice()">Lock Dice</button>
+<button onclick="bankPoints()">Bank Points</button>
 
-  <div id="output"></div>
-  <div id="dice"></div>
-  <div id="scoreboard"></div>
+<div id="output"></div>
+<div id="dice"></div>
+<div id="scoreboard"></div>
 
 <script type="py">
 import random
 from collections import Counter
 from js import window
 
-# --- Game State ---
+# ---------------- STATE ----------------
 players = []
 scores = []
-ai_players = []
 current_player = 0
+
 turn_score = 0
 dice_left = 6
+
 current_roll = []
 selected = []
-kept_dice = []
+locked_dice = []
 
-# --- Speak helper ---
-def speak(text):
-    utterance = window.SpeechSynthesisUtterance.new(text)
-    window.speechSynthesis.speak(utterance)
-
-# --- Scoring rules ---
+# ---------------- SCORING ----------------
 def score_dice(dice):
     counts = Counter(dice)
-    score = 0
     values = sorted(counts.values())
 
-    # Special 6-dice combos
-    if sorted(dice) == [1,2,3,4,5,6]:
-        return 1500, 6
-    if values == [2,2,2]:
-        return 1500, 6
-    if values == [3,3]:
-        return 2500, 6
-    if values == [2,4]:
-        return 1500, 6
+    if sorted(dice) == [1,2,3,4,5,6]: return 1500, 6
+    if values == [3,3]: return 2500, 6
+    if values == [2,2,2]: return 1500, 6
+    if values == [2,4]: return 1500, 6
 
-    used = 0
-    for num, count in counts.items():
-        if count >= 3:
-            if count == 3:
-                score += 1000 if num == 1 else num * 100
-            elif count == 4:
-                score += 1000
-            elif count == 5:
-                score += 2000
-            elif count == 6:
-                score += 3000
-            used += count
+    score = used = 0
+    for num, cnt in counts.items():
+        if cnt >= 3:
+            score += 1000 if num == 1 else num * 100
+            used += cnt
             counts[num] = 0
 
     score += counts[1] * 100
@@ -89,139 +68,115 @@ def score_dice(dice):
 
     return score, used
 
-# --- Dice rendering ---
-def render_dice():
-    dice_div = window.document.getElementById("dice")
-    dice_div.innerHTML = ""
+# ---------------- UI ----------------
+def render():
+    d = window.document.getElementById("dice")
+    d.innerHTML = ""
+
     for i, die in enumerate(current_roll):
         cls = "selected" if i in selected else ""
-        dice_div.innerHTML += f"<button class='die {cls}' onclick='toggleDie({i})'>{die}</button>"
+        d.innerHTML += f"<button class='die {cls}' onclick='toggleDie({i})'>{die}</button>"
 
-def toggle_die(index):
-    if index in selected:
-        selected.remove(index)
+    for die in locked_dice:
+        d.innerHTML += f"<button class='die locked'>{die}</button>"
+
+    update_scoreboard()
+
+def update_scoreboard():
+    html = "<h3>Scores</h3>"
+    for i, p in enumerate(players):
+        arrow = "➡️" if i == current_player else ""
+        html += f"{arrow} {p}: {scores[i]}<br>"
+    window.document.getElementById("scoreboard").innerHTML = html
+
+# ---------------- GAME ACTIONS ----------------
+def toggle_die(i):
+    if i in selected:
+        selected.remove(i)
     else:
-        selected.append(index)
-    render_dice()
+        selected.append(i)
+    render()
 
 window.toggleDie = toggle_die
 
-# --- Roll dice ---
-def roll(*args):
-    global current_roll, selected, dice_left
+def roll():
+    global current_roll, selected
 
-    if dice_left <= 0:
-        dice_left = 6
-        kept_dice.clear()  # Hot Dice
+    if dice_left == 0:
+        hot_dice()
 
-    # Only roll dice not yet kept
     current_roll = [random.randint(1,6) for _ in range(dice_left)]
     selected.clear()
-    render_dice()
-    window.document.getElementById("output").innerHTML = f"{players[current_player]} rolled. Select dice to keep!"
+    render()
 
-# --- Hold ---
-def hold(*args):
-    global turn_score, dice_left, current_player, kept_dice, selected
+    # Auto Farkle detection
+    score, _ = score_dice(current_roll)
+    if score == 0:
+        farkle()
+
+def lock():
+    global dice_left, turn_score
 
     if not selected:
-        window.document.getElementById("output").innerHTML = "Select dice before holding!"
+        window.document.getElementById("output").innerHTML = "Select scoring dice!"
         return
 
     chosen = [current_roll[i] for i in selected]
     score, used = score_dice(chosen)
+
     if score == 0:
-        window.document.getElementById("output").innerHTML = "Invalid selection!"
+        window.document.getElementById("output").innerHTML = "Invalid dice selection"
         return
 
     turn_score += score
     dice_left -= used
-    kept_dice.extend(chosen)
+    locked_dice.extend(chosen)
+
+    for i in sorted(selected, reverse=True):
+        del current_roll[i]
+
     selected.clear()
-    render_dice()
+    render()
 
-    window.document.getElementById("output").innerHTML = f"{players[current_player]} scored {score} points!"
+def bank():
+    global current_player, turn_score, dice_left
 
-    # Hot Dice: all dice scored
-    if dice_left <= 0:
-        dice_left = 6
-        kept_dice.clear()
-        window.document.getElementById("output").innerHTML += "<br>🔥 Hot Dice! Roll all 6 again!"
-
-    # Update total score
     scores[current_player] += turn_score
-    update_scoreboard()
+    next_player()
 
-    # Check win
-    if scores[current_player] >= 10000:
-        window.document.getElementById("output").innerHTML = f"🏆 {players[current_player]} wins with {scores[current_player]} points!"
-        speak(f"{players[current_player]} wins!")
-        return
+def farkle():
+    window.document.getElementById("output").innerHTML = "🔥 FARKLE!"
+    next_player()
 
-    # Next player
-    turn_score = 0
+def hot_dice():
+    global dice_left
     dice_left = 6
-    kept_dice.clear()
-    current_player = (current_player + 1) % len(players)
-    window.document.getElementById("output").innerHTML += f"<br>Next up: {players[current_player]}"
-    speak(f"{players[current_player]}'s turn")
+    locked_dice.clear()
+    window.document.getElementById("output").innerHTML = "🔥 HOT DICE!"
 
-    # AI turn
-    if ai_players[current_player]:
-        ai_turn()
-
-# --- Scoreboard ---
-def update_scoreboard():
-    html = "<h3>Scores</h3>"
-    for i, name in enumerate(players):
-        turn = "➡️" if i == current_player else ""
-        html += f"{turn} {name}: {scores[i]}<br>"
-    window.document.getElementById("scoreboard").innerHTML = html
-
-# --- AI logic ---
-def ai_turn():
-    global selected
-    speak(f"{players[current_player]} (AI) is rolling!")
-    import js
-    while True:
-        roll()
-        js.window.setTimeout(lambda: None, 500)
-        selected = list(range(len(current_roll)))
-        chosen = [current_roll[i] for i in selected]
-        score, used = score_dice(chosen)
-        if score == 0:
-            break
-        if score >= 500:
-            hold()
-            break
-
-# --- Start Game ---
-def start_game():
-    global players, scores, ai_players, current_player, turn_score, dice_left, current_roll, selected, kept_dice
-    count = int(window.prompt("How many players?"))
-    players = []
-    scores = [0] * count
-    ai_players = []
-    current_player = 0
+def next_player():
+    global current_player, turn_score, dice_left, current_roll, locked_dice, selected
     turn_score = 0
     dice_left = 6
     current_roll = []
+    locked_dice = []
     selected = []
-    kept_dice = []
+    current_player = (current_player + 1) % len(players)
+    render()
 
-    for i in range(count):
-        name = window.prompt(f"Enter name for Player {i+1}")
-        players.append(name)
-        is_ai = window.confirm(f"Is {name} an AI player?")
-        ai_players.append(is_ai)
+# ---------------- START ----------------
+def start_game():
+    global players, scores, current_player
+    n = int(window.prompt("How many players?"))
+    players = [window.prompt(f"Player {i+1} name") for i in range(n)]
+    scores = [0]*n
+    current_player = 0
+    next_player()
 
-    update_scoreboard()
-    window.document.getElementById("output").innerHTML = f"{players[current_player]}'s turn!"
-    speak(f"{players[current_player]}'s turn")
-
-# --- Expose functions to JS ---
+# ---------------- EXPOSE ----------------
 window.rollDice = roll
-window.holdDice = hold
+window.lockDice = lock
+window.bankPoints = bank
 window.startGame = start_game
 </script>
 </body>
