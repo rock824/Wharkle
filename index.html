@@ -1,183 +1,976 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>🎲 Farkle</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-<script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+<title>Wharkle 🎲</title>
 
 <style>
-  body { font-family: sans-serif; }
-  .die { font-size: 22px; padding: 10px; margin: 4px; }
-  .selected { background: gold; }
-  .locked { background: lightgreen; }
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at top, #26374a 0%, #15202b 45%, #0c1218 100%);
+    color: #f4f7fa;
+  }
+
+  .app {
+    width: min(900px, 94%);
+    margin: 0 auto;
+    padding: 28px 0 50px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.4rem, 8vw, 4.5rem);
+    letter-spacing: 2px;
+  }
+
+  .subtitle {
+    color: #aebdcc;
+    margin-top: 4px;
+  }
+
+  .panel {
+    background: rgba(17, 27, 37, 0.94);
+    border: 1px solid #34495e;
+    border-radius: 18px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.25);
+  }
+
+  .status {
+    text-align: center;
+    font-size: 1.15rem;
+    min-height: 28px;
+    font-weight: 600;
+  }
+
+  .final-round {
+    display: none;
+    text-align: center;
+    background: #6d4c00;
+    border: 1px solid #d6a800;
+    color: #ffe993;
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 16px;
+    font-weight: 700;
+  }
+
+  .turn-info {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .stat {
+    background: #101922;
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .stat-label {
+    font-size: .8rem;
+    text-transform: uppercase;
+    color: #8ea0b2;
+    letter-spacing: 1px;
+  }
+
+  .stat-value {
+    display: block;
+    margin-top: 4px;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .dice-area {
+    text-align: center;
+  }
+
+  .dice-title {
+    color: #aebdcc;
+    margin-bottom: 12px;
+  }
+
+  #dice {
+    min-height: 95px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .die {
+    width: 72px;
+    height: 72px;
+    border-radius: 15px;
+    border: 3px solid transparent;
+    background: #f5f5f5;
+    color: #101010;
+    cursor: pointer;
+    font-size: 3rem;
+    line-height: 1;
+    transition: transform .12s ease, border-color .12s ease;
+    box-shadow: 0 6px 12px rgba(0,0,0,.3);
+  }
+
+  .die:hover:not(:disabled) {
+    transform: translateY(-3px);
+  }
+
+  .die.selected {
+    border-color: #ffc107;
+    background: #fff3b0;
+    transform: translateY(-5px);
+  }
+
+  .die.locked {
+    background: #b7e4c7;
+    border-color: #39a85a;
+    cursor: default;
+  }
+
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  button.action {
+    border: 0;
+    border-radius: 12px;
+    padding: 14px 10px;
+    font-size: 1rem;
+    font-weight: 800;
+    cursor: pointer;
+    background: #2b78c5;
+    color: white;
+    transition: opacity .15s ease, transform .1s ease;
+  }
+
+  button.action:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  button.action:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+  }
+
+  #startButton {
+    background: #4c9b58;
+  }
+
+  #bankButton {
+    background: #a67313;
+  }
+
+  #scoreboard h2,
+  .rules h2 {
+    margin-top: 0;
+  }
+
+  .player {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #101922;
+    margin: 8px 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border-left: 4px solid transparent;
+  }
+
+  .player.current {
+    border-left-color: #ffc107;
+    background: #172534;
+  }
+
+  .player-name {
+    font-weight: 700;
+  }
+
+  .player-score {
+    font-size: 1.25rem;
+    font-weight: 900;
+  }
+
+  .rules {
+    color: #b7c3cf;
+    font-size: .92rem;
+  }
+
+  .rules ul {
+    columns: 2;
+    padding-left: 22px;
+  }
+
+  .rules li {
+    margin-bottom: 5px;
+  }
+
+  @media (max-width: 650px) {
+    .controls {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .turn-info {
+      grid-template-columns: 1fr;
+    }
+
+    .die {
+      width: 58px;
+      height: 58px;
+      font-size: 2.4rem;
+    }
+
+    .rules ul {
+      columns: 1;
+    }
+  }
 </style>
 </head>
 
 <body>
-<h1>🎲 Farkle</h1>
 
-<button onclick="startGame()">Start Game</button>
-<button onclick="rollDice()">Roll</button>
-<button onclick="lockDice()">Lock Dice</button>
-<button onclick="bankPoints()">Bank Points</button>
+<div class="app">
 
-<div id="output"></div>
-<div id="dice"></div>
-<div id="scoreboard"></div>
+  <header>
+    <h1>🎲 Wharkle</h1>
+    <div class="subtitle">A dangerously competitive game of Farkle</div>
+  </header>
 
-<script type="py">
-import random
-from collections import Counter
-from js import window
+  <div id="finalRound" class="final-round">
+    🔥 FINAL ROUND — beat the current leader!
+  </div>
 
-# ---------------- STATE ----------------
-players = []
-scores = []
-current_player = 0
+  <div class="panel">
+    <div id="status" class="status">
+      Start a game to begin.
+    </div>
+  </div>
 
-turn_score = 0
-dice_left = 6
+  <div class="panel turn-info">
+    <div class="stat">
+      <span class="stat-label">Current Player</span>
+      <span id="currentPlayer" class="stat-value">—</span>
+    </div>
 
-current_roll = []
-selected = []
-locked_dice = []
+    <div class="stat">
+      <span class="stat-label">Turn Score</span>
+      <span id="turnScore" class="stat-value">0</span>
+    </div>
 
-# ---------------- SCORING ----------------
-def score_dice(dice):
-    counts = Counter(dice)
-    values = sorted(counts.values())
+    <div class="stat">
+      <span class="stat-label">Dice Remaining</span>
+      <span id="diceLeft" class="stat-value">6</span>
+    </div>
+  </div>
 
-    if sorted(dice) == [1,2,3,4,5,6]: return 1500, 6
-    if values == [3,3]: return 2500, 6
-    if values == [2,2,2]: return 1500, 6
-    if values == [2,4]: return 1500, 6
+  <div class="panel dice-area">
 
-    score = used = 0
-    for num, cnt in counts.items():
-        if cnt >= 3:
-            score += 1000 if num == 1 else num * 100
-            used += cnt
-            counts[num] = 0
+    <div class="dice-title">
+      Click scoring dice to select them
+    </div>
 
-    score += counts[1] * 100
-    used += counts[1]
-    score += counts[5] * 50
-    used += counts[5]
+    <div id="dice"></div>
 
-    return score, used
+  </div>
 
-# ---------------- UI ----------------
-def render():
-    d = window.document.getElementById("dice")
-    d.innerHTML = ""
+  <div class="panel controls">
 
-    for i, die in enumerate(current_roll):
-        cls = "selected" if i in selected else ""
-        d.innerHTML += f"<button class='die {cls}' onclick='toggleDie({i})'>{die}</button>"
+    <button
+      id="startButton"
+      class="action"
+      onclick="startGame()">
+      New Game
+    </button>
 
-    for die in locked_dice:
-        d.innerHTML += f"<button class='die locked'>{die}</button>"
+    <button
+      id="rollButton"
+      class="action"
+      onclick="rollDice()">
+      🎲 Roll
+    </button>
 
-    update_scoreboard()
+    <button
+      id="lockButton"
+      class="action"
+      onclick="lockDice()">
+      🔒 Lock Dice
+    </button>
 
-def update_scoreboard():
-    html = "<h3>Scores</h3>"
-    for i, p in enumerate(players):
-        arrow = "➡️" if i == current_player else ""
-        html += f"{arrow} {p}: {scores[i]}<br>"
-    window.document.getElementById("scoreboard").innerHTML = html
+    <button
+      id="bankButton"
+      class="action"
+      onclick="bankPoints()">
+      💰 Bank
+    </button>
 
-# ---------------- GAME ACTIONS ----------------
-def toggle_die(i):
-    if i in selected:
-        selected.remove(i)
-    else:
-        selected.append(i)
-    render()
+  </div>
 
-window.toggleDie = toggle_die
+  <div id="scoreboard" class="panel">
+    <h2>Scores</h2>
+    <div>No game started.</div>
+  </div>
 
-def roll():
-    global current_roll, selected
+  <div class="panel rules">
+    <h2>Scoring</h2>
 
-    if dice_left == 0:
-        hot_dice()
+    <ul>
+      <li>Single 1 = 100</li>
+      <li>Single 5 = 50</li>
+      <li>Three 1s = 1000</li>
+      <li>Three 2s = 200</li>
+      <li>Three 3s = 300</li>
+      <li>Three 4s = 400</li>
+      <li>Three 5s = 500</li>
+      <li>Three 6s = 600</li>
+      <li>Straight 1–6 = 1500</li>
+      <li>Three pairs = 1500</li>
+      <li>Two triplets = 2500</li>
+      <li>Four of a kind + pair = 1500</li>
+    </ul>
+  </div>
 
-    current_roll = [random.randint(1,6) for _ in range(dice_left)]
-    selected.clear()
-    render()
+</div>
 
-    # Auto Farkle detection
-    score, _ = score_dice(current_roll)
-    if score == 0:
-        farkle()
+<script>
 
-def lock():
-    global dice_left, turn_score
+const WIN_SCORE = 10000;
 
-    if not selected:
-        window.document.getElementById("output").innerHTML = "Select scoring dice!"
-        return
+let players = [];
+let scores = [];
 
-    chosen = [current_roll[i] for i in selected]
-    score, used = score_dice(chosen)
+let currentPlayer = 0;
 
-    if score == 0:
-        window.document.getElementById("output").innerHTML = "Invalid dice selection"
-        return
+let turnScore = 0;
+let diceLeft = 6;
 
-    turn_score += score
-    dice_left -= used
-    locked_dice.extend(chosen)
+let currentRoll = [];
+let selected = new Set();
+let lockedDice = [];
 
-    for i in sorted(selected, reverse=True):
-        del current_roll[i]
+let gameStarted = false;
+let gameOver = false;
+let canRoll = false;
 
-    selected.clear()
-    render()
+let finalRoundActive = false;
+let finalRoundStarter = null;
 
-def bank():
-    global current_player, turn_score, dice_left
+let statusMessage = "Start a game to begin.";
 
-    scores[current_player] += turn_score
-    next_player()
+const dieFaces = {
+  1: "⚀",
+  2: "⚁",
+  3: "⚂",
+  4: "⚃",
+  5: "⚄",
+  6: "⚅"
+};
 
-def farkle():
-    window.document.getElementById("output").innerHTML = "🔥 FARKLE!"
-    next_player()
 
-def hot_dice():
-    global dice_left
-    dice_left = 6
-    locked_dice.clear()
-    window.document.getElementById("output").innerHTML = "🔥 HOT DICE!"
+/* -------------------------------------------------
+   SCORING
+------------------------------------------------- */
 
-def next_player():
-    global current_player, turn_score, dice_left, current_roll, locked_dice, selected
-    turn_score = 0
-    dice_left = 6
-    current_roll = []
-    locked_dice = []
-    selected = []
-    current_player = (current_player + 1) % len(players)
-    render()
+function scoreDice(dice) {
 
-# ---------------- START ----------------
-def start_game():
-    global players, scores, current_player
-    n = int(window.prompt("How many players?"))
-    players = [window.prompt(f"Player {i+1} name") for i in range(n)]
-    scores = [0]*n
-    current_player = 0
-    next_player()
+  const counts = {};
 
-# ---------------- EXPOSE ----------------
-window.rollDice = roll
-window.lockDice = lock
-window.bankPoints = bank
-window.startGame = start_game
+  for (const die of dice) {
+    counts[die] = (counts[die] || 0) + 1;
+  }
+
+  const values = Object.values(counts).sort((a, b) => a - b);
+
+  if (
+    dice.length === 6 &&
+    [...dice].sort((a,b) => a-b).join(",") === "1,2,3,4,5,6"
+  ) {
+    return { score: 1500, used: 6 };
+  }
+
+  if (
+    dice.length === 6 &&
+    values.length === 2 &&
+    values[0] === 3 &&
+    values[1] === 3
+  ) {
+    return { score: 2500, used: 6 };
+  }
+
+  if (
+    dice.length === 6 &&
+    values.length === 3 &&
+    values.every(v => v === 2)
+  ) {
+    return { score: 1500, used: 6 };
+  }
+
+  if (
+    dice.length === 6 &&
+    values.length === 2 &&
+    values[0] === 2 &&
+    values[1] === 4
+  ) {
+    return { score: 1500, used: 6 };
+  }
+
+  let score = 0;
+  let used = 0;
+
+  for (const [numberText, count] of Object.entries(counts)) {
+
+    const number = Number(numberText);
+
+    if (count >= 3) {
+
+      score += number === 1
+        ? 1000
+        : number * 100;
+
+      used += count;
+
+      counts[number] = 0;
+    }
+  }
+
+  if (counts[1]) {
+    score += counts[1] * 100;
+    used += counts[1];
+  }
+
+  if (counts[5]) {
+    score += counts[5] * 50;
+    used += counts[5];
+  }
+
+  return { score, used };
+}
+
+
+/* -------------------------------------------------
+   UI
+------------------------------------------------- */
+
+function setStatus(message) {
+  statusMessage = message;
+}
+
+function render() {
+
+  document.getElementById("status").textContent = statusMessage;
+
+  document.getElementById("currentPlayer").textContent =
+    gameStarted && players.length
+      ? players[currentPlayer]
+      : "—";
+
+  document.getElementById("turnScore").textContent =
+    turnScore.toLocaleString();
+
+  document.getElementById("diceLeft").textContent =
+    diceLeft;
+
+  document.getElementById("finalRound").style.display =
+    finalRoundActive && !gameOver
+      ? "block"
+      : "none";
+
+  renderDice();
+  renderScoreboard();
+  updateButtons();
+}
+
+
+function renderDice() {
+
+  const diceContainer = document.getElementById("dice");
+
+  diceContainer.innerHTML = "";
+
+  if (!currentRoll.length && !lockedDice.length) {
+
+    diceContainer.innerHTML =
+      "<span style='color:#8191a1'>Roll the dice!</span>";
+
+    return;
+  }
+
+  currentRoll.forEach((die, index) => {
+
+    const button = document.createElement("button");
+
+    button.className = "die";
+
+    if (selected.has(index)) {
+      button.classList.add("selected");
+    }
+
+    button.textContent = dieFaces[die];
+
+    button.title = `Die ${die}`;
+
+    button.onclick = () => toggleDie(index);
+
+    diceContainer.appendChild(button);
+  });
+
+  lockedDice.forEach(die => {
+
+    const button = document.createElement("button");
+
+    button.className = "die locked";
+    button.disabled = true;
+
+    button.textContent = dieFaces[die];
+    button.title = `Locked ${die}`;
+
+    diceContainer.appendChild(button);
+  });
+}
+
+
+function renderScoreboard() {
+
+  const scoreboard = document.getElementById("scoreboard");
+
+  let html = "<h2>Scores</h2>";
+
+  if (!players.length) {
+
+    html += "<div>No game started.</div>";
+
+    scoreboard.innerHTML = html;
+
+    return;
+  }
+
+  players.forEach((player, index) => {
+
+    const current =
+      !gameOver && index === currentPlayer
+        ? " current"
+        : "";
+
+    html += `
+      <div class="player${current}">
+        <span class="player-name">
+          ${index === currentPlayer && !gameOver ? "➡️ " : ""}
+          ${escapeHtml(player)}
+        </span>
+
+        <span class="player-score">
+          ${scores[index].toLocaleString()}
+        </span>
+      </div>
+    `;
+  });
+
+  scoreboard.innerHTML = html;
+}
+
+
+function updateButtons() {
+
+  document.getElementById("rollButton").disabled =
+    !gameStarted ||
+    gameOver ||
+    !canRoll;
+
+  document.getElementById("lockButton").disabled =
+    !gameStarted ||
+    gameOver ||
+    currentRoll.length === 0 ||
+    selected.size === 0;
+
+  document.getElementById("bankButton").disabled =
+    !gameStarted ||
+    gameOver ||
+    turnScore <= 0;
+}
+
+
+function escapeHtml(value) {
+
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+/* -------------------------------------------------
+   GAME ACTIONS
+------------------------------------------------- */
+
+function toggleDie(index) {
+
+  if (selected.has(index)) {
+    selected.delete(index);
+  } else {
+    selected.add(index);
+  }
+
+  render();
+}
+
+
+function rollDice() {
+
+  if (!gameStarted || gameOver || !canRoll) {
+    return;
+  }
+
+  if (diceLeft === 0) {
+
+    diceLeft = 6;
+    lockedDice = [];
+
+    setStatus(
+      `🔥 HOT DICE! ${players[currentPlayer]} rolls all six again.`
+    );
+  }
+
+  currentRoll = [];
+
+  for (let i = 0; i < diceLeft; i++) {
+    currentRoll.push(
+      Math.floor(Math.random() * 6) + 1
+    );
+  }
+
+  selected.clear();
+
+  canRoll = false;
+
+  const result = scoreDice(currentRoll);
+
+  if (result.score === 0) {
+
+    render();
+
+    setTimeout(() => {
+      farkle();
+    }, 250);
+
+    return;
+  }
+
+  setStatus(
+    `${players[currentPlayer]} rolled. Select scoring dice.`
+  );
+
+  render();
+}
+
+
+function lockDice() {
+
+  if (!selected.size) {
+
+    setStatus("Select at least one scoring die.");
+
+    render();
+
+    return;
+  }
+
+  const selectedIndexes =
+    [...selected].sort((a,b) => a-b);
+
+  const chosen =
+    selectedIndexes.map(index => currentRoll[index]);
+
+  const result = scoreDice(chosen);
+
+  if (result.score === 0) {
+
+    setStatus("❌ Those dice do not score.");
+
+    render();
+
+    return;
+  }
+
+  /*
+    Important fix:
+    EVERY selected die must contribute to scoring.
+  */
+
+  if (result.used !== chosen.length) {
+
+    setStatus(
+      "❌ One or more selected dice do not score. Select only scoring dice."
+    );
+
+    render();
+
+    return;
+  }
+
+  turnScore += result.score;
+
+  diceLeft -= chosen.length;
+
+  lockedDice.push(...chosen);
+
+  currentRoll = [];
+
+  selected.clear();
+
+  canRoll = true;
+
+  if (diceLeft === 0) {
+
+    setStatus(
+      `🔥 HOT DICE! +${result.score} points. Bank ${turnScore} or roll all six again.`
+    );
+
+  } else {
+
+    setStatus(
+      `✅ +${result.score} points. Turn total: ${turnScore}. Roll again or bank.`
+    );
+  }
+
+  render();
+}
+
+
+function bankPoints() {
+
+  if (turnScore <= 0 || gameOver) {
+    return;
+  }
+
+  const player = currentPlayer;
+  const banked = turnScore;
+
+  scores[player] += banked;
+
+  if (
+    !finalRoundActive &&
+    scores[player] >= WIN_SCORE
+  ) {
+
+    finalRoundActive = true;
+    finalRoundStarter = player;
+  }
+
+  setStatus(
+    `💰 ${players[player]} banked ${banked.toLocaleString()} points.`
+  );
+
+  endTurn();
+}
+
+
+function farkle() {
+
+  const playerName = players[currentPlayer];
+  const lostPoints = turnScore;
+
+  setStatus(
+    `🔥 FARKLE! ${playerName} lost ${lostPoints.toLocaleString()} turn points.`
+  );
+
+  endTurn();
+}
+
+
+function endTurn() {
+
+  const previousMessage = statusMessage;
+
+  turnScore = 0;
+  diceLeft = 6;
+
+  currentRoll = [];
+  selected.clear();
+  lockedDice = [];
+
+  canRoll = true;
+
+  const next =
+    (currentPlayer + 1) % players.length;
+
+  /*
+    If the turn would return to the player who
+    started the final round, everyone else has
+    received their final turn.
+  */
+
+  if (
+    finalRoundActive &&
+    next === finalRoundStarter
+  ) {
+
+    finishGame();
+
+    return;
+  }
+
+  currentPlayer = next;
+
+  if (finalRoundActive) {
+
+    setStatus(
+      `${previousMessage} FINAL ROUND — ${players[currentPlayer]}'s turn.`
+    );
+
+  } else {
+
+    setStatus(
+      `${previousMessage} ${players[currentPlayer]}'s turn.`
+    );
+  }
+
+  render();
+}
+
+
+function finishGame() {
+
+  gameOver = true;
+  canRoll = false;
+
+  const highestScore =
+    Math.max(...scores);
+
+  const winners =
+    players.filter(
+      (_, index) => scores[index] === highestScore
+    );
+
+  if (winners.length === 1) {
+
+    setStatus(
+      `🏆 ${winners[0]} wins Wharkle with ${highestScore.toLocaleString()} points!`
+    );
+
+  } else {
+
+    setStatus(
+      `🏆 Tie game! ${winners.join(" and ")} finished with ${highestScore.toLocaleString()} points.`
+    );
+  }
+
+  render();
+}
+
+
+/* -------------------------------------------------
+   START GAME
+------------------------------------------------- */
+
+function startGame() {
+
+  const response =
+    window.prompt(
+      "How many players? (1-8)",
+      players.length || 2
+    );
+
+  if (response === null) {
+    return;
+  }
+
+  const numberOfPlayers =
+    Number.parseInt(response, 10);
+
+  if (
+    Number.isNaN(numberOfPlayers) ||
+    numberOfPlayers < 1 ||
+    numberOfPlayers > 8
+  ) {
+
+    window.alert(
+      "Enter a number from 1 through 8."
+    );
+
+    return;
+  }
+
+  const newPlayers = [];
+
+  for (let i = 0; i < numberOfPlayers; i++) {
+
+    const entered =
+      window.prompt(
+        `Player ${i + 1} name`,
+        `Player ${i + 1}`
+      );
+
+    if (entered === null) {
+      return;
+    }
+
+    const name =
+      entered.trim() ||
+      `Player ${i + 1}`;
+
+    newPlayers.push(name);
+  }
+
+  players = newPlayers;
+  scores = new Array(players.length).fill(0);
+
+  /*
+    Important fix:
+    Start with Player 1.
+    Do NOT call nextPlayer() here.
+  */
+
+  currentPlayer = 0;
+
+  turnScore = 0;
+  diceLeft = 6;
+
+  currentRoll = [];
+  selected.clear();
+  lockedDice = [];
+
+  finalRoundActive = false;
+  finalRoundStarter = null;
+
+  gameStarted = true;
+  gameOver = false;
+  canRoll = true;
+
+  setStatus(
+    `${players[currentPlayer]}'s turn. Roll the dice!`
+  );
+
+  render();
+}
+
+
+/* -------------------------------------------------
+   INITIAL DISPLAY
+------------------------------------------------- */
+
+render();
+
 </script>
+
 </body>
 </html>
