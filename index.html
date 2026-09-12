@@ -4,6 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wharkle 🎲</title>
+
+<!--
+  WHARKLE UPDATE NOTES — 2026-09-12
+
+  Gameplay / UI:
+  - Removed the separate "Lock Dice" button.
+  - After a roll, click the scoring dice you want to keep.
+  - "Roll Again" automatically scores/keeps the selected dice, then rerolls the rest.
+  - "Bank" automatically scores/keeps the selected dice, then banks the turn.
+  - Previously kept dice never combine with dice from a later roll to form a scoring combo.
+
+  Scoring updates:
+  - Four of a kind = 1,000
+  - Five of a kind = 2,000
+  - Six of a kind = 3,000
+  - All combinations must be made in ONE roll.
+  - Straight 1-6 = 1,500
+  - Three pairs = 1,500
+  - Two triplets = 2,500
+  - Four of a kind + pair = 1,500
+
+  Existing Wharkle rules retained:
+  - 500 points required in one turn to get on the scoreboard.
+  - After getting on the scoreboard, any scoring amount may be banked.
+  - Farkle loses only the unbanked points from the current turn.
+  - Game target = 10,000, followed by the final round.
+-->
+
 <style>
   * { box-sizing: border-box; }
 
@@ -190,7 +218,7 @@
       selectedGlow 1.4s ease-in-out infinite;
   }
 
-  .die.locked {
+  .die.kept {
     background: linear-gradient(145deg, #effff3 0%, #a7eeba 50%, #64c77f 100%);
     border-color: #39a85a;
     cursor: default;
@@ -202,7 +230,7 @@
 
   .controls {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
   }
 
@@ -275,6 +303,11 @@
     font-size: .92rem;
   }
 
+  .rule-important {
+    color: #ffe082;
+    font-weight: 800;
+  }
+
   .rules ul {
     columns: 2;
     padding-left: 22px;
@@ -283,7 +316,7 @@
   .rules li { margin-bottom: 5px; }
 
   @media (max-width: 650px) {
-    .controls { grid-template-columns: 1fr 1fr; }
+    .controls { grid-template-columns: 1fr; }
     .turn-info { grid-template-columns: 1fr; }
 
     #dice {
@@ -337,14 +370,15 @@
   </div>
 
   <div class="panel dice-area">
-    <div class="dice-title">Click scoring dice to select them</div>
+    <div class="dice-title">
+      Select the scoring dice you want to keep, then Roll Again or Bank
+    </div>
     <div id="dice"></div>
   </div>
 
   <div class="panel controls">
     <button id="startButton" class="action" onclick="startGame()">New Game</button>
     <button id="rollButton" class="action" onclick="rollDice()">🎲 Roll</button>
-    <button id="lockButton" class="action" onclick="lockDice()">🔒 Lock Dice</button>
     <button id="bankButton" class="action" onclick="bankPoints()">💰 Bank</button>
   </div>
 
@@ -354,8 +388,13 @@
   </div>
 
   <div class="panel rules">
-    <h2>Scoring</h2>
+    <h2>Scoring & Rules</h2>
     <ul>
+      <li class="rule-important">All scoring combinations must be made in a single roll</li>
+      <li class="rule-important">Kept dice from an earlier roll cannot combine with newly rolled dice to make a combination</li>
+      <li>Select scoring dice, then choose Roll Again or Bank</li>
+      <li>Roll Again automatically keeps and scores your selected dice before rerolling the rest</li>
+      <li>Bank automatically keeps and scores your selected dice before ending your turn</li>
       <li>Must bank at least 500 in one turn to get on the scoreboard</li>
       <li>After entering the scoreboard, you may bank any scoring amount</li>
       <li>Farkle loses only the unbanked points from that turn</li>
@@ -367,10 +406,15 @@
       <li>Three 4s = 400</li>
       <li>Three 5s = 500</li>
       <li>Three 6s = 600</li>
+      <li>Four of a kind = 1000</li>
+      <li>Five of a kind = 2000</li>
+      <li>Six of a kind = 3000</li>
       <li>Straight 1–6 = 1500</li>
       <li>Three pairs = 1500</li>
       <li>Two triplets = 2500</li>
       <li>Four of a kind + pair = 1500</li>
+      <li>Score all six dice to get Hot Dice and continue with all six</li>
+      <li>First player to reach 10,000 triggers the final round</li>
     </ul>
   </div>
 
@@ -390,11 +434,10 @@ let diceLeft = 6;
 
 let currentRoll = [];
 let selected = new Set();
-let lockedDice = [];
+let keptDice = [];
 
 let gameStarted = false;
 let gameOver = false;
-let canRoll = false;
 
 let finalRoundActive = false;
 let finalRoundStarter = null;
@@ -410,6 +453,11 @@ const dieFaces = {
   6: "⚅"
 };
 
+/*
+  IMPORTANT:
+  scoreDice() is only ever given dice from ONE roll/selection.
+  keptDice is visual/history only and is NEVER included in combination scoring.
+*/
 function scoreDice(dice) {
   const counts = {};
 
@@ -419,6 +467,7 @@ function scoreDice(dice) {
 
   const values = Object.values(counts).sort((a, b) => a - b);
 
+  // Six-die special combinations.
   if (
     dice.length === 6 &&
     [...dice].sort((a, b) => a - b).join(",") === "1,2,3,4,5,6"
@@ -458,13 +507,26 @@ function scoreDice(dice) {
   for (const [numberText, count] of Object.entries(counts)) {
     const number = Number(numberText);
 
-    if (count >= 3) {
+    if (count === 6) {
+      score += 3000;
+      used += 6;
+      counts[number] = 0;
+    } else if (count === 5) {
+      score += 2000;
+      used += 5;
+      counts[number] = 0;
+    } else if (count === 4) {
+      score += 1000;
+      used += 4;
+      counts[number] = 0;
+    } else if (count === 3) {
       score += number === 1 ? 1000 : number * 100;
-      used += count;
+      used += 3;
       counts[number] = 0;
     }
   }
 
+  // Any leftover single 1s and 5s score normally.
   if (counts[1]) {
     score += counts[1] * 100;
     used += counts[1];
@@ -480,6 +542,69 @@ function scoreDice(dice) {
 
 function setStatus(message) {
   statusMessage = message;
+}
+
+function getSelectedDice() {
+  return [...selected]
+    .sort((a, b) => a - b)
+    .map(index => currentRoll[index]);
+}
+
+function getSelectionResult() {
+  const chosen = getSelectedDice();
+
+  if (!chosen.length) {
+    return { chosen, score: 0, used: 0, valid: false };
+  }
+
+  const result = scoreDice(chosen);
+
+  return {
+    chosen,
+    score: result.score,
+    used: result.used,
+    valid: result.score > 0 && result.used === chosen.length
+  };
+}
+
+/*
+  Commits ONLY the selected dice from the current roll.
+  Previously kept dice are never passed into scoreDice().
+*/
+function commitSelection() {
+  const selection = getSelectionResult();
+
+  if (!selection.chosen.length) {
+    setStatus("❌ Select at least one scoring die first.");
+    render();
+    return null;
+  }
+
+  if (selection.score === 0) {
+    setStatus("❌ Those selected dice do not score.");
+    render();
+    return null;
+  }
+
+  if (!selection.valid) {
+    setStatus(
+      "❌ One or more selected dice do not score. Select only scoring dice."
+    );
+    render();
+    return null;
+  }
+
+  turnScore += selection.score;
+  diceLeft -= selection.chosen.length;
+  keptDice.push(...selection.chosen);
+
+  currentRoll = [];
+  selected.clear();
+
+  return {
+    score: selection.score,
+    hotDice: diceLeft === 0
+  };
 }
 
 function render() {
@@ -505,12 +630,13 @@ function renderDice() {
   const diceContainer = document.getElementById("dice");
   diceContainer.innerHTML = "";
 
-  if (!currentRoll.length && !lockedDice.length) {
+  if (!currentRoll.length && !keptDice.length) {
     diceContainer.innerHTML =
       "<span style='color:#8191a1'>Roll the dice!</span>";
     return;
   }
 
+  // Current roll first: these are the only dice that can be selected.
   currentRoll.forEach((die, index) => {
     const button = document.createElement("button");
 
@@ -521,19 +647,21 @@ function renderDice() {
     }
 
     button.textContent = dieFaces[die];
-    button.title = `Die ${die}`;
+    button.title = `Rolled ${die}`;
     button.onclick = () => toggleDie(index);
 
     diceContainer.appendChild(button);
   });
 
-  lockedDice.forEach(die => {
+  // Green dice were scored on earlier rolls in this same turn.
+  // They are display-only and cannot combine with the current roll.
+  keptDice.forEach(die => {
     const button = document.createElement("button");
 
-    button.className = "die locked";
+    button.className = "die kept";
     button.disabled = true;
     button.textContent = dieFaces[die];
-    button.title = `Locked ${die}`;
+    button.title = `Previously kept ${die}`;
 
     diceContainer.appendChild(button);
   });
@@ -579,27 +707,41 @@ function renderScoreboard() {
 }
 
 function updateButtons() {
-  const needsEntry =
-    gameStarted &&
-    players.length &&
-    !onBoard[currentPlayer];
+  const rollButton = document.getElementById("rollButton");
+  const bankButton = document.getElementById("bankButton");
 
-  document.getElementById("rollButton").disabled =
-    !gameStarted ||
-    gameOver ||
-    !canRoll;
+  if (!gameStarted || gameOver) {
+    rollButton.disabled = true;
+    bankButton.disabled = true;
+    return;
+  }
 
-  document.getElementById("lockButton").disabled =
-    !gameStarted ||
-    gameOver ||
-    currentRoll.length === 0 ||
-    selected.size === 0;
+  // Before the first roll of a turn, Roll is always available.
+  // After dice are on the table, a valid scoring selection is required.
+  if (!currentRoll.length) {
+    rollButton.disabled = false;
+    rollButton.textContent = "🎲 Roll";
+    bankButton.disabled = true;
+    return;
+  }
 
-  document.getElementById("bankButton").disabled =
-    !gameStarted ||
-    gameOver ||
-    turnScore <= 0 ||
-    (needsEntry && turnScore < ENTRY_SCORE);
+  rollButton.textContent = "🎲 Roll Again";
+
+  const selection = getSelectionResult();
+
+  rollButton.disabled = !selection.valid;
+
+  const potentialTurnTotal =
+    turnScore + (selection.valid ? selection.score : 0);
+
+  const meetsEntryRequirement =
+    onBoard[currentPlayer] ||
+    potentialTurnTotal >= ENTRY_SCORE;
+
+  bankButton.disabled =
+    !selection.valid ||
+    potentialTurnTotal <= 0 ||
+    !meetsEntryRequirement;
 }
 
 function escapeHtml(value) {
@@ -612,24 +754,60 @@ function escapeHtml(value) {
 }
 
 function toggleDie(index) {
+  if (!gameStarted || gameOver || !currentRoll.length) {
+    return;
+  }
+
   if (selected.has(index)) {
     selected.delete(index);
   } else {
     selected.add(index);
   }
 
+  const selection = getSelectionResult();
+
+  if (selection.chosen.length) {
+    if (selection.valid) {
+      setStatus(
+        `Selected scoring dice: +${selection.score.toLocaleString()}. Roll Again or Bank.`
+      );
+    } else {
+      setStatus(
+        "Select only dice that form a valid scoring set from this roll."
+      );
+    }
+  } else {
+    setStatus(
+      `${players[currentPlayer]}'s roll. Select scoring dice to keep.`
+    );
+  }
+
   render();
 }
 
 function rollDice() {
-  if (!gameStarted || gameOver || !canRoll) {
+  if (!gameStarted || gameOver) {
     return;
   }
 
+  let committed = null;
+
+  // If dice are currently on the table, Roll Again first commits
+  // the selected scoring dice from THIS roll.
+  if (currentRoll.length) {
+    committed = commitSelection();
+
+    if (!committed) {
+      return;
+    }
+  }
+
+  let hotDice = false;
+
   if (diceLeft === 0) {
+    hotDice = true;
     diceLeft = 6;
-    lockedDice = [];
-    setStatus(`🔥 HOT DICE! ${players[currentPlayer]} rolls all six again.`);
+    keptDice = [];
   }
 
   currentRoll = [];
@@ -639,11 +817,18 @@ function rollDice() {
   }
 
   selected.clear();
-  canRoll = false;
 
   const result = scoreDice(currentRoll);
 
   if (result.score === 0) {
+    if (committed) {
+      setStatus(
+        `✅ +${committed.score.toLocaleString()} points, then... 🔥 FARKLE!`
+      );
+    } else {
+      setStatus("🔥 FARKLE!");
+    }
+
     render();
 
     setTimeout(() => {
@@ -653,61 +838,17 @@ function rollDice() {
     return;
   }
 
-  setStatus(`${players[currentPlayer]} rolled. Select scoring dice.`);
-  render();
-}
-
-function lockDice() {
-  if (!selected.size) {
-    setStatus("Select at least one scoring die.");
-    render();
-    return;
-  }
-
-  const selectedIndexes =
-    [...selected].sort((a, b) => a - b);
-
-  const chosen =
-    selectedIndexes.map(index => currentRoll[index]);
-
-  const result = scoreDice(chosen);
-
-  if (result.score === 0) {
-    setStatus("❌ Those dice do not score.");
-    render();
-    return;
-  }
-
-  if (result.used !== chosen.length) {
+  if (!committed) {
     setStatus(
-      "❌ One or more selected dice do not score. Select only scoring dice."
+      `${players[currentPlayer]} rolled. Select scoring dice, then Roll Again or Bank.`
     );
-    render();
-    return;
-  }
-
-  turnScore += result.score;
-  diceLeft -= chosen.length;
-
-  lockedDice.push(...chosen);
-
-  currentRoll = [];
-  selected.clear();
-  canRoll = true;
-
-  if (!onBoard[currentPlayer] && turnScore < ENTRY_SCORE) {
-    const remaining = ENTRY_SCORE - turnScore;
-
+  } else if (hotDice) {
     setStatus(
-      `✅ +${result.score} points. Turn total: ${turnScore}. You need ${remaining} more to get on the board.`
-    );
-  } else if (diceLeft === 0) {
-    setStatus(
-      `🔥 HOT DICE! +${result.score} points. Bank ${turnScore} or roll all six again.`
+      `🔥 HOT DICE! +${committed.score.toLocaleString()} points. All six dice are back in play.`
     );
   } else {
     setStatus(
-      `✅ +${result.score} points. Turn total: ${turnScore}. Roll again or bank.`
+      `✅ +${committed.score.toLocaleString()} points. Turn total: ${turnScore.toLocaleString()}. Select scoring dice, then Roll Again or Bank.`
     );
   }
 
@@ -715,23 +856,39 @@ function lockDice() {
 }
 
 function bankPoints() {
-  if (turnScore <= 0 || gameOver) {
+  if (!gameStarted || gameOver || !currentRoll.length) {
     return;
   }
 
-  const player = currentPlayer;
-  const banked = turnScore;
+  const preview = getSelectionResult();
 
-  if (!onBoard[player] && banked < ENTRY_SCORE) {
-    const remaining = ENTRY_SCORE - banked;
+  if (!preview.valid) {
+    setStatus("❌ Select only valid scoring dice before banking.");
+    render();
+    return;
+  }
+
+  const potentialTurnTotal = turnScore + preview.score;
+
+  if (!onBoard[currentPlayer] && potentialTurnTotal < ENTRY_SCORE) {
+    const remaining = ENTRY_SCORE - potentialTurnTotal;
 
     setStatus(
-      `❌ ${players[player]} needs ${remaining} more points before banking.`
+      `❌ You need ${remaining.toLocaleString()} more points before you can bank and get on the board.`
     );
 
     render();
     return;
   }
+
+  const committed = commitSelection();
+
+  if (!committed) {
+    return;
+  }
+
+  const player = currentPlayer;
+  const banked = turnScore;
 
   if (!onBoard[player]) {
     onBoard[player] = true;
@@ -770,9 +927,7 @@ function endTurn() {
 
   currentRoll = [];
   selected.clear();
-  lockedDice = [];
-
-  canRoll = true;
+  keptDice = [];
 
   const next =
     (currentPlayer + 1) % players.length;
@@ -802,7 +957,6 @@ function endTurn() {
 
 function finishGame() {
   gameOver = true;
-  canRoll = false;
 
   const highestScore = Math.max(...scores);
 
@@ -878,14 +1032,13 @@ function startGame() {
 
   currentRoll = [];
   selected.clear();
-  lockedDice = [];
+  keptDice = [];
 
   finalRoundActive = false;
   finalRoundStarter = null;
 
   gameStarted = true;
   gameOver = false;
-  canRoll = true;
 
   setStatus(
     `${players[currentPlayer]}'s turn. Roll the dice! You need ${ENTRY_SCORE} points in one turn to get on the board.`
